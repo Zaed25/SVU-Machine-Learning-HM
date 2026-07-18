@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from sklearn.datasets import fetch_california_housing
 
 st.set_page_config(page_title="California Housing Dashboard", layout="wide")
@@ -23,10 +24,20 @@ filtered = df[
 ]
 st.write(f"Filtered rows: {len(filtered)} / {len(df)}")
 
-#خريطة المنازل بعد الفلترة، ملوّنة حسب السعر
+#خريطة المنازل بعد الفلترة، ملوّنة فعلياً حسب السعر (أصفر=رخيص، أحمر=غالي)
 st.subheader("Map (colored by MedHouseVal)")
-st.map(filtered.rename(columns={"Latitude": "lat", "Longitude": "lon"})[["lat", "lon"]])
+price_min, price_max = df["MedHouseVal"].min(), df["MedHouseVal"].max()
+norm_price = (filtered["MedHouseVal"] - price_min) / (price_max - price_min)
 
-#توزيع الأسعار للبيانات المفلترة
+map_df = filtered.rename(columns={"Latitude": "lat", "Longitude": "lon"})[["lat", "lon"]].copy()
+map_df["color"] = norm_price.apply(lambda v: f"#ff{int(255 * (1 - v)):02x}00")
+
+st.map(map_df, color="color")
+
+#توزيع الأسعار للبيانات المفلترة (نبني تسميات نظيفة بدل Interval objects)
 st.subheader("MedHouseVal Distribution")
-st.bar_chart(filtered["MedHouseVal"].value_counts(bins=10).sort_index())
+counts, bin_edges = np.histogram(filtered["MedHouseVal"], bins=10)
+labels = [f"{bin_edges[i]:.2f}-{bin_edges[i + 1]:.2f}" for i in range(len(bin_edges) - 1)]
+hist_series = pd.Series(counts, index=labels, name="Count")
+
+st.bar_chart(hist_series)
